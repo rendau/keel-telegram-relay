@@ -3,7 +3,6 @@ package keel
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -39,34 +38,43 @@ func Parse(data []byte) (*Event, error) {
 }
 
 // Text builds a plain-text telegram message (no parse_mode, so nothing to escape).
+//
+// The first line leads with the affected resource name so it is visible in the
+// notification preview (a locked screen shows only the first line). Everything
+// that is not essential (redundant name, verbose metadata, nanosecond
+// timestamp) is dropped — telegram already shows the message time.
 func (e *Event) Text() string {
 	var sb strings.Builder
 
-	sb.WriteString(levelIcon(e.Level) + " Keel")
+	sb.WriteString(levelIcon(e.Level))
+	if name := e.resourceName(); name != "" {
+		sb.WriteString(" " + name)
+	} else {
+		sb.WriteString(" Keel")
+	}
 	if e.Type != "" {
 		sb.WriteString(" · " + e.Type)
 	}
-	sb.WriteString("\n")
 
-	if e.Name != "" {
-		sb.WriteString(e.Name + "\n")
-	}
 	if e.Message != "" {
-		sb.WriteString("\n" + e.Message + "\n")
-	}
-
-	if len(e.Metadata) > 0 {
-		sb.WriteString("\n")
-		for _, k := range sortedKeys(e.Metadata) {
-			sb.WriteString(fmt.Sprintf("%s: %v\n", k, e.Metadata[k]))
-		}
-	}
-
-	if e.CreatedAt != "" {
-		sb.WriteString("\n" + e.CreatedAt)
+		sb.WriteString("\n" + e.Message)
 	}
 
 	return strings.TrimRight(sb.String(), "\n")
+}
+
+// resourceName returns the name of the affected resource (e.g. the deployment
+// name) taken from metadata, or "" if it is not present.
+func (e *Event) resourceName() string {
+	v, ok := e.Metadata["name"]
+	if !ok {
+		return ""
+	}
+	s, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(s)
 }
 
 func levelIcon(level string) string {
@@ -80,13 +88,4 @@ func levelIcon(level string) string {
 	default:
 		return "🚀"
 	}
-}
-
-func sortedKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
