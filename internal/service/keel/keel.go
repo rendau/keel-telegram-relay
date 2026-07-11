@@ -71,18 +71,13 @@ func (e *Event) Text() string {
 	return strings.TrimRight(sb.String(), "\n")
 }
 
-// resourceName returns the name of the affected resource, preferring the
-// namespace/name from metadata (e.g. "default/oms") and falling back to the
-// bare name or the event name.
+// resourceName returns the name of the affected resource, taken from metadata
+// and falling back to the event name.
 func (e *Event) resourceName() string {
-	name := e.metaString("name")
-	if name == "" {
-		return strings.TrimSpace(e.Name)
+	if name := e.metaString("name"); name != "" {
+		return name
 	}
-	if ns := e.metaString("namespace"); ns != "" {
-		return ns + "/" + name
-	}
-	return name
+	return strings.TrimSpace(e.Name)
 }
 
 // parenRe captures the last parenthesised group of the keel message, which is
